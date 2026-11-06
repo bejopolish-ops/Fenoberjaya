@@ -301,6 +301,7 @@
             <div class="space-y-3">
               <div class="space-y-2"><p class="text-sm font-semibold text-slate-800">1. Laporan keuangan keseluruhan</p><div class="flex flex-wrap gap-2"><button id="boss-report-link-copy-overall" type="button" class="hidden rounded-lg border border-slate-300 bg-white px-4 py-2 text-sm font-semibold hover:bg-slate-50">Salin tautan keseluruhan</button><input id="boss-report-link-url-overall" readonly class="hidden field bg-white text-sm" aria-label="Tautan laporan keuangan keseluruhan untuk bos"></div></div>
               <div class="space-y-2"><p class="text-sm font-semibold text-slate-800">2. Laporan harian (hari ini)</p><div class="flex flex-wrap gap-2"><button id="boss-report-link-copy-daily" type="button" class="hidden rounded-lg border border-slate-300 bg-white px-4 py-2 text-sm font-semibold hover:bg-slate-50">Salin tautan harian</button><input id="boss-report-link-url-daily" readonly class="hidden field bg-white text-sm" aria-label="Tautan laporan harian untuk bos"></div></div>
+              <div class="space-y-2"><p class="text-sm font-semibold text-slate-800">3. Laporan custom (rentang tanggal)</p><div class="grid gap-3 sm:grid-cols-2"><label class="text-sm font-medium text-slate-700">Dari tanggal<input id="boss-report-custom-start" type="date" class="field mt-1"></label><label class="text-sm font-medium text-slate-700">Sampai tanggal<input id="boss-report-custom-end" type="date" class="field mt-1"></label></div><div class="flex flex-wrap gap-2"><button id="boss-report-link-copy-custom" type="button" class="hidden rounded-lg border border-slate-300 bg-white px-4 py-2 text-sm font-semibold hover:bg-slate-50">Salin tautan custom</button><input id="boss-report-link-url-custom" readonly class="hidden field bg-white text-sm" aria-label="Tautan laporan custom untuk bos"></div><p id="boss-report-custom-link-error" class="hidden text-sm text-rose-700" role="alert"></p></div>
             </div>
             <div class="flex flex-wrap gap-2"><button id="boss-report-link-create" type="button" class="rounded-lg bg-slate-900 px-4 py-2 text-sm font-semibold text-white hover:bg-slate-700">Buat / perbarui kedua tautan</button><button id="boss-report-link-revoke" type="button" class="hidden rounded-lg border border-rose-200 bg-white px-4 py-2 text-sm font-semibold text-rose-700 hover:bg-rose-50">Cabut akses kedua tautan</button></div>
           </section>
@@ -402,6 +403,8 @@
       let bossReportRefreshInFlight = false;
       let activeBossReportToken = "";
       let activeBossReportType = "overall";
+      let activeBossReportStart = "";
+      let activeBossReportEnd = "";
       $("shipment-date").value = today;
       $("cash-note-date").value = today;
       let pendingPhoto = "";
@@ -529,6 +532,14 @@
         if (!date) return "-";
         const parsed = new Date(`${date}T00:00:00`);
         return Number.isNaN(parsed.getTime()) ? date : new Intl.DateTimeFormat("id-ID", { day:"2-digit", month:"short", year:"numeric" }).format(parsed);
+      }
+      function isValidIsoDate(value) {
+        const match = /^(\d{4})-(\d{2})-(\d{2})$/.exec(value || "");
+        if (!match) return false;
+        const date = new Date(Date.UTC(Number(match[1]),Number(match[2]) - 1,Number(match[3])));
+        return date.getUTCFullYear() === Number(match[1])
+          && date.getUTCMonth() === Number(match[2]) - 1
+          && date.getUTCDate() === Number(match[3]);
       }
       function notify(message, isError) {
         const el = $("toast");
@@ -886,17 +897,31 @@
         const hasShareToken = /^[a-f0-9]{64}$/.test(state.reportShareToken);
         $("boss-report-link-copy-overall").classList.toggle("hidden",!hasShareToken);
         $("boss-report-link-copy-daily").classList.toggle("hidden",!hasShareToken);
+        $("boss-report-link-copy-custom").classList.toggle("hidden",!hasShareToken);
         $("boss-report-link-revoke").classList.toggle("hidden",!hasShareToken);
         ["overall","daily"].forEach((type) => {
           const input = $(`boss-report-link-url-${type}`);
           input.classList.toggle("hidden",!hasShareToken);
           input.value = hasShareToken ? createBossReportUrl(state.reportShareToken,type) : "";
         });
+        const customInput = $("boss-report-link-url-custom");
+        const hasCustomRange = isValidIsoDate($("boss-report-custom-start").value)
+          && isValidIsoDate($("boss-report-custom-end").value)
+          && $("boss-report-custom-start").value <= $("boss-report-custom-end").value;
+        customInput.classList.toggle("hidden",!hasShareToken || !hasCustomRange);
+        customInput.value = hasShareToken && hasCustomRange
+          ? createBossReportUrl(state.reportShareToken,"custom",$("boss-report-custom-start").value,$("boss-report-custom-end").value)
+          : "";
       }
-      function createBossReportUrl(token,type) {
+      function createBossReportUrl(token,type,start,end) {
         const url = new URL(location.href);
         url.search = "";
-        url.hash = `viewer=${token}&report=${type}`;
+        const route = new URLSearchParams({ viewer:token,report:type });
+        if (type === "custom") {
+          route.set("start",start);
+          route.set("end",end);
+        }
+        url.hash = route.toString();
         return url.href;
       }
       function renderBossReport() {
@@ -904,20 +929,25 @@
         const allExpenses = bossReportData.expenses;
         const reportExpenses = activeBossReportType === "daily"
           ? allExpenses.filter((item) => item.date === reportDate)
-          : allExpenses;
+          : activeBossReportType === "custom"
+            ? allExpenses.filter((item) => isInRange(item.date,activeBossReportStart,activeBossReportEnd))
+            : allExpenses;
         const expenses = [...reportExpenses].sort((a,b) => String(b.date || "").localeCompare(String(a.date || "")));
         const dailyDescription = `Pengeluaran pada ${dateLabel(reportDate)}.`;
-        $("boss-report-title").textContent = activeBossReportType === "daily" ? "Laporan Keuangan Harian" : "Laporan Keuangan Keseluruhan";
-        $("boss-report-description").textContent = activeBossReportType === "daily"
-          ? `Akses bos · hanya-baca · ${dailyDescription}`
-          : "Akses bos · hanya-baca · seluruh data pengeluaran";
-        $("boss-report-chart-description").textContent = activeBossReportType === "daily"
+        const isDaily = activeBossReportType === "daily";
+        const isCustom = activeBossReportType === "custom";
+        const customRangeDescription = `Pengeluaran ${dateLabel(activeBossReportStart)} sampai ${dateLabel(activeBossReportEnd)}.`;
+        const reportTitle = isDaily ? "Laporan Keuangan Harian" : isCustom ? "Laporan Keuangan Custom" : "Laporan Keuangan Keseluruhan";
+        const reportDescription = isDaily ? dailyDescription : isCustom ? customRangeDescription : "Seluruh data pengeluaran.";
+        $("boss-report-title").textContent = reportTitle;
+        $("boss-report-description").textContent = `Akses bos · hanya-baca · ${reportDescription}`;
+        $("boss-report-chart-description").textContent = isDaily
           ? `Perbandingan nominal pengeluaran pada ${dateLabel(reportDate)}.`
-          : "Perbandingan nominal semua pengeluaran.";
-        $("boss-report-total-label").textContent = activeBossReportType === "daily" ? "Total pengeluaran hari ini" : "Total pengeluaran keseluruhan";
-        $("boss-report-expenses-description").textContent = activeBossReportType === "daily"
-          ? `${dailyDescription} Bukti foto dapat dibuka dari tombol Lihat foto.`
-          : "Bukti foto dapat dibuka dari tombol Lihat foto.";
+          : isCustom
+            ? `Perbandingan nominal pengeluaran ${dateLabel(activeBossReportStart)} sampai ${dateLabel(activeBossReportEnd)}.`
+            : "Perbandingan nominal semua pengeluaran.";
+        $("boss-report-total-label").textContent = isDaily ? "Total pengeluaran hari ini" : isCustom ? "Total pengeluaran periode ini" : "Total pengeluaran keseluruhan";
+        $("boss-report-expenses-description").textContent = `${reportDescription} Bukti foto dapat dibuka dari tombol Lihat foto.`;
         const totals = {};
         const chartTypes = [["GJ HARIAN","Gaji harian","bg-sky-500"],["GJ BORONGAN","Gaji borongan released","bg-indigo-500"],["OP","Operasional","bg-amber-500"],["KB","Kasbon","bg-rose-500"],["SBM","Beli material","bg-emerald-500"]];
         chartTypes.forEach(([type]) => {
@@ -980,13 +1010,26 @@
         $("public-report-screen").classList.remove("hidden");
         const route = new URLSearchParams(location.hash.slice(1));
         const token = route.get("viewer") || "";
-        activeBossReportType = route.get("report") === "daily" ? "daily" : "overall";
+        const reportType = route.get("report");
+        activeBossReportType = reportType === "daily" || reportType === "custom" ? reportType : "overall";
+        activeBossReportStart = route.get("start") || "";
+        activeBossReportEnd = route.get("end") || "";
         const isDailyReport = activeBossReportType === "daily";
-        document.title = `${isDailyReport ? "Laporan Harian" : "Laporan Keseluruhan"} - FENO BERJAYA`;
-        $("boss-report-title").textContent = isDailyReport ? "Laporan Keuangan Harian" : "Laporan Keuangan Keseluruhan";
+        const isCustomReport = activeBossReportType === "custom";
+        const reportTitle = isDailyReport ? "Laporan Keuangan Harian" : isCustomReport ? "Laporan Keuangan Custom" : "Laporan Keuangan Keseluruhan";
+        document.title = `${isDailyReport ? "Laporan Harian" : isCustomReport ? "Laporan Custom" : "Laporan Keseluruhan"} - FENO BERJAYA`;
+        $("boss-report-title").textContent = reportTitle;
         $("boss-report-description").textContent = isDailyReport
           ? `Akses bos · hanya-baca · Pengeluaran pada ${dateLabel(localDate(new Date()))}.`
-          : "Akses bos · hanya-baca · seluruh data pengeluaran";
+          : isCustomReport
+            ? `Akses bos · hanya-baca · Pengeluaran ${dateLabel(activeBossReportStart)} sampai ${dateLabel(activeBossReportEnd)}.`
+            : "Akses bos · hanya-baca · seluruh data pengeluaran";
+        if (isCustomReport && (!isValidIsoDate(activeBossReportStart) || !isValidIsoDate(activeBossReportEnd) || activeBossReportStart > activeBossReportEnd)) {
+          $("boss-report-refresh-status").textContent = "Rentang tanggal tidak valid";
+          $("boss-report-error").textContent = "Rentang tanggal tautan laporan custom tidak valid. Minta admin membuat tautan baru dengan tanggal yang benar.";
+          $("boss-report-error").classList.remove("hidden");
+          return;
+        }
         if (!/^[a-f0-9]{64}$/.test(token)) {
           $("boss-report-refresh-status").textContent = "Tautan tidak valid";
           $("boss-report-error").textContent = "Tautan viewer tidak valid. Minta admin mengirimkan tautan yang benar.";
@@ -2346,6 +2389,38 @@
             notify("Salin tautan yang sudah dipilih secara manual.",true);
           }
         });
+      });
+      ["boss-report-custom-start","boss-report-custom-end"].forEach((id) => {
+        $(id).addEventListener("input",() => {
+          $("boss-report-custom-link-error").classList.add("hidden");
+          renderBossReportLink();
+        });
+      });
+      $("boss-report-link-copy-custom").addEventListener("click",async () => {
+        const start = $("boss-report-custom-start").value;
+        const end = $("boss-report-custom-end").value;
+        const errorMessage = !isValidIsoDate(start) || !isValidIsoDate(end)
+          ? "Pilih tanggal mulai dan tanggal akhir yang valid."
+          : start > end
+            ? "Tanggal mulai tidak boleh melewati tanggal akhir."
+            : "";
+        if (errorMessage) {
+          $("boss-report-custom-link-error").textContent = errorMessage;
+          $("boss-report-custom-link-error").classList.remove("hidden");
+          return;
+        }
+        renderBossReportLink();
+        const input = $("boss-report-link-url-custom");
+        try {
+          await navigator.clipboard.writeText(input.value);
+          notify(`Tautan laporan ${dateLabel(start)} sampai ${dateLabel(end)} berhasil disalin.`);
+        } catch (error) {
+          console.error("Tautan laporan custom tidak dapat disalin otomatis.",error);
+          input.classList.remove("hidden");
+          input.focus();
+          input.select();
+          notify("Salin tautan yang sudah dipilih secara manual.",true);
+        }
       });
       $("boss-report-link-revoke").addEventListener("click",async () => {
         if (!state.reportShareToken || !confirm("Cabut akses kedua tautan? Tautan lama akan langsung berhenti berfungsi.")) return;
