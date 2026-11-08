@@ -66,7 +66,7 @@
   <section id="public-ledger-screen" class="hidden min-h-screen px-4 py-6 sm:px-6 lg:px-8">
     <div class="mx-auto max-w-7xl space-y-6">
       <header class="flex flex-wrap items-center justify-between gap-4 rounded-2xl bg-slate-900 p-5 text-white shadow-sm sm:p-6">
-        <div class="flex items-center gap-4"><div class="grid h-14 w-14 shrink-0 place-items-center overflow-hidden rounded-xl bg-white p-1"><img src="./logo.png" alt="Logo FENO BERJAYA" class="h-full w-full object-contain"></div><div><p class="text-sm text-slate-300">FB Workshop System</p><h1 class="text-2xl font-bold">Buku Besar</h1><p class="mt-1 text-sm text-slate-300">Akses bos · hanya-baca</p></div></div>
+        <div class="flex items-center gap-4"><div class="grid h-14 w-14 shrink-0 place-items-center overflow-hidden rounded-xl bg-white p-1"><img src="./logo.png" alt="Logo FENO BERJAYA" class="h-full w-full object-contain"></div><div><p class="text-sm text-slate-300">FB Workshop System</p><h1 class="text-2xl font-bold">Buku Besar</h1><p id="boss-ledger-description" class="mt-1 text-sm text-slate-300">Akses bos · hanya-baca</p></div></div>
         <p id="boss-ledger-refresh-status" class="text-sm text-slate-300" role="status">Memuat Buku Besar...</p>
       </header>
       <p id="boss-ledger-error" class="hidden rounded-xl border border-rose-200 bg-rose-50 p-4 text-sm text-rose-800" role="alert"></p>
@@ -312,8 +312,12 @@
             </section>
             <section class="space-y-4 rounded-2xl border border-amber-200 bg-amber-50 p-5 shadow-sm">
               <div><h2 class="font-bold text-slate-900">Tautan Buku Besar untuk Bos</h2><p class="mt-1 text-sm text-slate-600">Tautan hanya-baca menampilkan pemasukan dan pengeluaran Buku Besar. Siapa pun yang memegang tautan dapat melihatnya; cabut akses untuk menonaktifkannya.</p></div>
-              <div class="flex flex-wrap gap-2"><button id="ledger-share-create" type="button" class="rounded-lg bg-slate-900 px-4 py-2 text-sm font-semibold text-white hover:bg-slate-700">Buat / perbarui tautan Bos</button><button id="ledger-share-copy" type="button" class="hidden rounded-lg border border-slate-300 bg-white px-4 py-2 text-sm font-semibold hover:bg-slate-50">Salin tautan</button><button id="ledger-share-revoke" type="button" class="hidden rounded-lg border border-rose-200 bg-white px-4 py-2 text-sm font-semibold text-rose-700 hover:bg-rose-50">Cabut akses</button></div>
-              <input id="ledger-share-url" readonly class="hidden field bg-white text-sm" aria-label="Tautan Buku Besar untuk bos">
+                    <div class="flex flex-wrap gap-2"><button id="ledger-share-create" type="button" class="rounded-lg bg-slate-900 px-4 py-2 text-sm font-semibold text-white hover:bg-slate-700">Buat / perbarui tautan Bos</button><button id="ledger-share-copy" type="button" class="hidden rounded-lg border border-slate-300 bg-white px-4 py-2 text-sm font-semibold hover:bg-slate-50">Salin tautan semua periode</button><button id="ledger-share-revoke" type="button" class="hidden rounded-lg border border-rose-200 bg-white px-4 py-2 text-sm font-semibold text-rose-700 hover:bg-rose-50">Cabut akses</button></div>
+                    <div class="grid gap-3 sm:grid-cols-2"><label class="text-sm font-medium text-slate-700">Tautan custom dari tanggal<input id="ledger-share-start" type="date" class="field mt-1"></label><label class="text-sm font-medium text-slate-700">Sampai tanggal<input id="ledger-share-end" type="date" class="field mt-1"></label></div>
+                    <p id="ledger-share-range-error" class="hidden text-sm text-rose-700" role="alert"></p>
+                    <div class="flex flex-wrap gap-2"><button id="ledger-share-copy-custom" type="button" disabled class="rounded-lg bg-amber-400 px-4 py-2 text-sm font-bold text-slate-950 hover:bg-amber-300 disabled:cursor-not-allowed disabled:opacity-50">Salin tautan custom</button></div>
+                    <input id="ledger-share-url" readonly class="hidden field bg-white text-sm" aria-label="Tautan Buku Besar untuk bos">
+                    <input id="ledger-share-url-custom" readonly class="hidden field bg-white text-sm" aria-label="Tautan periode custom Buku Besar untuk bos">
             </section>
             <section class="rounded-2xl bg-white p-5 shadow-sm"><h2 class="mb-4 font-bold">Riwayat transaksi</h2><div class="overflow-x-auto"><table class="w-full min-w-[650px] text-left text-sm"><thead class="text-xs uppercase text-slate-500"><tr><th class="py-2 pr-3">Tanggal</th><th class="py-2 pr-3">Jenis / penerima</th><th class="py-2 pr-3">Keterangan</th><th class="py-2 pr-3 text-right">Nominal</th><th class="py-2 text-right">Aksi</th></tr></thead><tbody id="ledger-rows"></tbody></table></div><p id="ledger-empty" class="hidden py-6 text-center text-sm text-slate-500">Belum ada transaksi pada periode ini.</p></section>
           </div>
@@ -459,6 +463,8 @@
       let activeBossReportToken = "";
       let activeBossLedgerToken = "";
       let bossLedgerRefreshInFlight = false;
+      let activeBossLedgerStart = "";
+      let activeBossLedgerEnd = "";
       let bossLedgerData = { incomes:[], expenses:[] };
       let activeBossReportType = "overall";
       let activeBossReportStart = "";
@@ -867,11 +873,33 @@
         $("ledger-share-copy").classList.toggle("hidden",!hasToken);
         $("ledger-share-revoke").classList.toggle("hidden",!hasToken);
         input.value = hasToken ? createBossLedgerUrl(state.ledgerShareToken) : "";
+        renderBossLedgerCustomLink();
       }
-      function createBossLedgerUrl(token) {
+      function renderBossLedgerCustomLink() {
+        const start = $("ledger-share-start").value;
+        const end = $("ledger-share-end").value;
+        const invalidDate = Boolean((start && !isValidIsoDate(start)) || (end && !isValidIsoDate(end)));
+        const invalidRange = Boolean(start && end && start > end);
+        const error = !state.ledgerShareToken
+          ? "Buat tautan Buku Besar terlebih dahulu."
+          : invalidDate ? "Tanggal yang dipilih tidak valid."
+          : invalidRange ? "Tanggal awal tidak boleh melewati tanggal akhir."
+          : !start || !end ? "Pilih tanggal awal dan tanggal akhir untuk membuat tautan custom."
+          : "";
+        $("ledger-share-range-error").textContent = error;
+        $("ledger-share-range-error").classList.toggle("hidden",!error);
+        $("ledger-share-copy-custom").disabled = Boolean(error);
+        $("ledger-share-url-custom").value = !error ? createBossLedgerUrl(state.ledgerShareToken,start,end) : "";
+      }
+      function createBossLedgerUrl(token,start,end) {
         const url = new URL(location.href);
         url.search = "";
-        url.hash = new URLSearchParams({ "ledger-viewer":token }).toString();
+        const route = new URLSearchParams({ "ledger-viewer":token });
+        if (start && end) {
+          route.set("start",start);
+          route.set("end",end);
+        }
+        url.hash = route.toString();
         return url.href;
       }
       function resetCashNoteForm() {
@@ -1211,13 +1239,15 @@
         bossReportRefreshTimer = window.setInterval(() => loadBossReport(token,true),30000);
       }
       function renderBossLedger() {
-        const incomes = [...bossLedgerData.incomes].sort((a,b) => String(b.date || "").localeCompare(String(a.date || "")));
+        const inRange = (item) => (!activeBossLedgerStart || item.date >= activeBossLedgerStart)
+          && (!activeBossLedgerEnd || item.date <= activeBossLedgerEnd);
+        const incomes = bossLedgerData.incomes.filter(inRange).sort((a,b) => String(b.date || "").localeCompare(String(a.date || "")));
         const entries = [
           ...incomes.map((item) => ({
             id:item.id,date:item.date,type:"income",recipient:item.recipient,
             description:item.description,amount:item.amount
           })),
-          ...bossLedgerData.expenses.map((item) => ({
+          ...bossLedgerData.expenses.filter(inRange).map((item) => ({
             id:item.id,date:item.date,type:"expense",recipient:item.worker,
             description:item.note || "-",amount:item.amount,category:item.type
           }))
@@ -1237,7 +1267,11 @@
         if (bossLedgerRefreshInFlight) return;
         bossLedgerRefreshInFlight = true;
         try {
-          const { data,error } = await supabaseClient.rpc("get_boss_ledger",{ share_token:token });
+          const { data,error } = await supabaseClient.rpc("get_boss_ledger",{
+            share_token:token,
+            range_start:activeBossLedgerStart || null,
+            range_end:activeBossLedgerEnd || null
+          });
           if (error) throw error;
           if (!data) {
             bossLedgerData = { incomes:[], expenses:[] };
@@ -1272,12 +1306,26 @@
         document.title = "Buku Besar - FENO BERJAYA";
         const route = new URLSearchParams(location.hash.slice(1));
         const token = route.get("ledger-viewer") || "";
+        activeBossLedgerStart = route.get("start") || "";
+        activeBossLedgerEnd = route.get("end") || "";
         if (!/^[a-f0-9]{64}$/.test(token)) {
           $("boss-ledger-refresh-status").textContent = "Tautan tidak valid";
           $("boss-ledger-error").textContent = "Tautan Buku Besar tidak valid. Minta admin mengirimkan tautan yang benar.";
           $("boss-ledger-error").classList.remove("hidden");
           return;
         }
+        if ((activeBossLedgerStart && !isValidIsoDate(activeBossLedgerStart))
+          || (activeBossLedgerEnd && !isValidIsoDate(activeBossLedgerEnd))
+          || (activeBossLedgerStart && activeBossLedgerEnd && activeBossLedgerStart > activeBossLedgerEnd)
+          || Boolean(activeBossLedgerStart) !== Boolean(activeBossLedgerEnd)) {
+          $("boss-ledger-refresh-status").textContent = "Rentang tanggal tidak valid";
+          $("boss-ledger-error").textContent = "Rentang tanggal tautan custom Buku Besar tidak valid. Minta admin membuat tautan baru.";
+          $("boss-ledger-error").classList.remove("hidden");
+          return;
+        }
+        $("boss-ledger-description").textContent = activeBossLedgerStart
+          ? `Akses bos · hanya-baca · ${dateLabel(activeBossLedgerStart)} sampai ${dateLabel(activeBossLedgerEnd)}`
+          : "Akses bos · hanya-baca · semua periode";
         activeBossLedgerToken = token;
         if (!window.supabase || typeof window.supabase.createClient !== "function") {
           $("boss-ledger-refresh-status").textContent = "Layanan tidak tersedia";
@@ -1300,7 +1348,9 @@
         try {
           const { data,error } = await supabaseClient.rpc("get_boss_ledger_income_photo",{
             share_token:activeBossLedgerToken,
-            income_id:income.id
+            income_id:income.id,
+            range_start:activeBossLedgerStart || null,
+            range_end:activeBossLedgerEnd || null
           });
           if (error) throw error;
           if (typeof data !== "string" || !data.startsWith("data:image/")) throw new Error("Foto bukti tidak tersedia.");
@@ -2996,6 +3046,24 @@
         }
         renderLedgerShareLink();
         notify("Akses viewer Buku Besar sudah dicabut.");
+      });
+      ["ledger-share-start","ledger-share-end"].forEach((id) => {
+        $(id).addEventListener("change",renderBossLedgerCustomLink);
+      });
+      $("ledger-share-copy-custom").addEventListener("click",async () => {
+        renderBossLedgerCustomLink();
+        if ($("ledger-share-copy-custom").disabled) return;
+        const input = $("ledger-share-url-custom");
+        try {
+          await navigator.clipboard.writeText(input.value);
+          notify(`Tautan Buku Besar ${dateLabel($("ledger-share-start").value)} sampai ${dateLabel($("ledger-share-end").value)} berhasil disalin.`);
+        } catch (error) {
+          console.error("Tautan custom Buku Besar tidak dapat disalin otomatis.",error);
+          input.classList.remove("hidden");
+          input.focus();
+          input.select();
+          notify("Salin tautan custom yang sudah dipilih secara manual.",true);
+        }
       });
       $("cash-note-daily-rate").addEventListener("input",calculateCashNoteBill);
       $("cash-note-daily-days").addEventListener("input",calculateCashNoteBill);
