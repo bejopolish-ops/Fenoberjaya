@@ -74,7 +74,7 @@
         <section class="grid gap-3 sm:grid-cols-3">
           <div class="rounded-2xl bg-emerald-50 p-5"><p class="text-sm text-emerald-800">Total pemasukan</p><p id="boss-ledger-income-total" class="mt-2 text-xl font-bold text-emerald-900"></p></div>
           <div class="rounded-2xl bg-rose-50 p-5"><p class="text-sm text-rose-800">Total pengeluaran</p><p id="boss-ledger-expense-total" class="mt-2 text-xl font-bold text-rose-900"></p></div>
-          <div class="rounded-2xl bg-slate-900 p-5 text-white"><p class="text-sm text-slate-300">Saldo</p><p id="boss-ledger-balance" class="mt-2 text-xl font-bold"></p></div>
+          <div class="rounded-2xl bg-slate-900 p-5 text-white"><p class="text-sm text-slate-300">Sisa saldo</p><p id="boss-ledger-balance" class="mt-2 text-xl font-bold"></p><p id="boss-ledger-opening-balance" class="mt-1 text-xs text-slate-300"></p></div>
         </section>
         <section class="rounded-2xl bg-white p-5 shadow-sm"><h2 class="mb-4 font-bold">Tabel Pemasukan</h2><div class="overflow-x-auto"><table class="w-full min-w-[720px] text-left text-sm"><thead class="text-xs uppercase text-slate-500"><tr><th class="py-2 pr-3">Tanggal</th><th class="py-2 pr-3">Nama penerima</th><th class="py-2 pr-3">Keterangan</th><th class="py-2 pr-3 text-right">Nominal</th><th class="py-2 text-right">Bukti</th></tr></thead><tbody id="boss-ledger-income-rows"></tbody></table></div><p id="boss-ledger-income-empty" class="hidden py-6 text-center text-sm text-slate-500">Belum ada data pemasukan.</p></section>
         <section class="rounded-2xl bg-white p-5 shadow-sm"><h2 class="mb-4 font-bold">Riwayat transaksi</h2><div class="overflow-x-auto"><table class="w-full min-w-[650px] text-left text-sm"><thead class="text-xs uppercase text-slate-500"><tr><th class="py-2 pr-3">Tanggal</th><th class="py-2 pr-3">Jenis / penerima</th><th class="py-2 pr-3">Keterangan</th><th class="py-2 text-right">Nominal</th></tr></thead><tbody id="boss-ledger-rows"></tbody></table></div><p id="boss-ledger-empty" class="hidden py-6 text-center text-sm text-slate-500">Belum ada transaksi Buku Besar.</p></section>
@@ -308,7 +308,7 @@
               <div class="mb-4 flex flex-wrap items-end justify-between gap-3"><div><h2 class="font-bold">Periode Buku Besar</h2><p class="text-sm text-slate-500">Ringkasan dan PDF mengikuti tanggal yang dipilih.</p></div><button id="ledger-pdf" type="button" class="rounded-lg bg-slate-900 px-4 py-2.5 text-sm font-bold text-white hover:bg-slate-700">Unduh PDF Buku Besar</button></div>
               <div class="grid gap-3 sm:grid-cols-2"><label class="text-sm font-medium">Dari tanggal<input id="ledger-filter-start" type="date" class="field mt-1"></label><label class="text-sm font-medium">Sampai tanggal<input id="ledger-filter-end" type="date" class="field mt-1"></label></div>
               <p id="ledger-range-error" class="mt-3 hidden text-sm text-rose-700" role="alert"></p>
-              <div class="mt-4 grid gap-3 sm:grid-cols-3"><div class="rounded-xl bg-emerald-50 p-3"><p class="text-xs text-emerald-800">Total pemasukan</p><p id="ledger-total-income" class="mt-1 font-bold text-emerald-900"></p></div><div class="rounded-xl bg-rose-50 p-3"><p class="text-xs text-rose-800">Total pengeluaran</p><p id="ledger-total-expense" class="mt-1 font-bold text-rose-900"></p></div><div class="rounded-xl bg-slate-100 p-3"><p class="text-xs text-slate-600">Saldo periode</p><p id="ledger-total-balance" class="mt-1 font-bold text-slate-900"></p></div></div>
+              <div class="mt-4 grid gap-3 sm:grid-cols-3"><div class="rounded-xl bg-emerald-50 p-3"><p class="text-xs text-emerald-800">Total pemasukan</p><p id="ledger-total-income" class="mt-1 font-bold text-emerald-900"></p></div><div class="rounded-xl bg-rose-50 p-3"><p class="text-xs text-rose-800">Total pengeluaran</p><p id="ledger-total-expense" class="mt-1 font-bold text-rose-900"></p></div><div class="rounded-xl bg-slate-100 p-3"><p class="text-xs text-slate-600">Sisa saldo</p><p id="ledger-total-balance" class="mt-1 font-bold text-slate-900"></p><p id="ledger-opening-balance" class="mt-1 text-xs text-slate-500"></p></div></div>
             </section>
             <section class="space-y-4 rounded-2xl border border-amber-200 bg-amber-50 p-5 shadow-sm">
               <div><h2 class="font-bold text-slate-900">Tautan Buku Besar untuk Bos</h2><p class="mt-1 text-sm text-slate-600">Tautan hanya-baca menampilkan pemasukan dan pengeluaran Buku Besar. Siapa pun yang memegang tautan dapat melihatnya; cabut akses untuk menonaktifkannya.</p></div>
@@ -859,12 +859,24 @@
         const entries = invalidRange ? [] : ledgerEntriesForPeriod();
         const income = entries.filter((entry) => entry.type === "income").reduce((sum,entry) => sum + Number(entry.amount),0);
         const expense = entries.filter((entry) => entry.type === "expense").reduce((sum,entry) => sum + Number(entry.amount),0);
+        const openingBalance = invalidRange ? 0 : ledgerOpeningBalance(start);
         $("ledger-total-income").textContent = rupiah(income);
         $("ledger-total-expense").textContent = rupiah(expense);
-        $("ledger-total-balance").textContent = rupiah(income - expense);
+        $("ledger-total-balance").textContent = rupiah(openingBalance + income - expense);
+        $("ledger-opening-balance").textContent = `Saldo awal sebelum periode: ${rupiah(openingBalance)}`;
         $("ledger-rows").innerHTML = entries.map((entry) => `<tr class="border-t border-slate-100 align-top"><td class="py-3 pr-3">${dateLabel(entry.date)}</td><td class="py-3 pr-3"><span class="font-semibold ${entry.type === "income" ? "text-emerald-700" : "text-rose-700"}">${entry.type === "income" ? "Pemasukan" : "Pengeluaran"}</span><div class="text-xs text-slate-500">${escapeHtml(entry.type === "income" ? entry.recipient : entry.category)}</div></td><td class="py-3 pr-3">${escapeHtml(entry.description)}</td><td class="py-3 pr-3 text-right font-semibold">${rupiah(entry.amount)}</td><td class="py-3 text-right whitespace-nowrap">${entry.source === "income" ? `${entry.photo ? `<button type="button" class="mr-2 text-xs font-semibold text-amber-700 hover:text-amber-900" data-ledger-photo="${escapeHtml(entry.id)}">Lihat bukti</button>` : ""}<button type="button" class="mr-2 text-xs font-semibold text-slate-600 hover:text-slate-900" data-edit-ledger="${escapeHtml(entry.id)}">Edit</button><button type="button" class="text-xs font-semibold text-rose-600 hover:text-rose-800" data-delete-ledger="${escapeHtml(entry.id)}">Hapus</button>` : '<span class="text-xs text-slate-400">Dari menu Pengeluaran</span>'}</td></tr>`).join("");
         $("ledger-empty").classList.toggle("hidden",entries.length > 0);
         $("ledger-pdf").disabled = invalidRange;
+      }
+      function ledgerOpeningBalance(start) {
+        if (!start) return 0;
+        const income = state.ledgerEntries
+          .filter((entry) => entry.type === "income" && entry.date < start)
+          .reduce((sum,entry) => sum + Number(entry.amount),0);
+        const expense = state.expenses
+          .filter((entry) => entry.date < start)
+          .reduce((sum,entry) => sum + Number(entry.amount),0);
+        return income - expense;
       }
       function renderLedgerShareLink() {
         const hasToken = /^[a-f0-9]{64}$/.test(state.ledgerShareToken);
@@ -1254,9 +1266,11 @@
         ].sort((a,b) => String(b.date || "").localeCompare(String(a.date || "")));
         const income = entries.filter((item) => item.type === "income").reduce((sum,item) => sum + Number(item.amount || 0),0);
         const expense = entries.filter((item) => item.type === "expense").reduce((sum,item) => sum + Number(item.amount || 0),0);
+        const openingBalance = Number(bossLedgerData.openingBalance || 0);
         $("boss-ledger-income-total").textContent = rupiah(income);
         $("boss-ledger-expense-total").textContent = rupiah(expense);
-        $("boss-ledger-balance").textContent = rupiah(income-expense);
+        $("boss-ledger-balance").textContent = rupiah(openingBalance + income - expense);
+        $("boss-ledger-opening-balance").textContent = `Saldo awal sebelum periode: ${rupiah(openingBalance)}`;
         $("boss-ledger-income-rows").innerHTML = incomes.map((item) => `<tr class="border-t border-slate-100 align-top"><td class="py-3 pr-3">${dateLabel(item.date)}</td><td class="py-3 pr-3 font-medium">${escapeHtml(item.recipient || "-")}</td><td class="py-3 pr-3">${escapeHtml(item.description || "-")}</td><td class="py-3 pr-3 text-right font-semibold">${rupiah(item.amount)}</td><td class="py-3 text-right">${item.hasPhoto ? `<button type="button" class="text-xs font-semibold text-amber-700 hover:text-amber-900" data-boss-ledger-photo="${escapeHtml(item.id)}">Lihat bukti</button>` : '<span class="text-xs text-slate-400">Tidak ada</span>'}</td></tr>`).join("");
         $("boss-ledger-income-empty").classList.toggle("hidden",incomes.length > 0);
         $("boss-ledger-rows").innerHTML = entries.map((item) => `<tr class="border-t border-slate-100 align-top"><td class="py-3 pr-3">${dateLabel(item.date)}</td><td class="py-3 pr-3"><span class="font-semibold ${item.type === "income" ? "text-emerald-700" : "text-rose-700"}">${item.type === "income" ? "Pemasukan" : "Pengeluaran"}</span><div class="text-xs text-slate-500">${escapeHtml(item.type === "income" ? item.recipient : `${item.category} · ${item.recipient}`)}</div></td><td class="py-3 pr-3">${escapeHtml(item.description)}</td><td class="py-3 text-right font-semibold">${rupiah(item.amount)}</td></tr>`).join("");
@@ -1274,14 +1288,14 @@
           });
           if (error) throw error;
           if (!data) {
-            bossLedgerData = { incomes:[], expenses:[] };
+            bossLedgerData = { incomes:[], expenses:[], openingBalance:0 };
             $("boss-ledger-content").classList.add("hidden");
             $("boss-ledger-error").textContent = "Tautan Buku Besar tidak valid atau aksesnya sudah dicabut. Minta admin membuat tautan baru.";
             $("boss-ledger-error").classList.remove("hidden");
             $("boss-ledger-refresh-status").textContent = "Akses tidak tersedia";
             return;
           }
-          if (!Array.isArray(data.incomes) || !Array.isArray(data.expenses)) throw new Error("Format data Buku Besar viewer tidak valid.");
+          if (!Array.isArray(data.incomes) || !Array.isArray(data.expenses) || !Number.isFinite(Number(data.openingBalance))) throw new Error("Format data Buku Besar viewer tidak valid.");
           bossLedgerData = data;
           renderBossLedger();
           $("boss-ledger-error").classList.add("hidden");
@@ -1501,6 +1515,7 @@
         const entries = ledgerEntriesForPeriod().sort((a,b) => a.date.localeCompare(b.date) || String(a.createdAt || "").localeCompare(String(b.createdAt || "")));
         const income = entries.filter((entry) => entry.type === "income").reduce((sum,entry) => sum + Number(entry.amount),0);
         const expense = entries.filter((entry) => entry.type === "expense").reduce((sum,entry) => sum + Number(entry.amount),0);
+        const openingBalance = ledgerOpeningBalance(start);
         const rangeLabel = start && end ? `${dateLabel(start)} - ${dateLabel(end)}` : start ? `Mulai ${dateLabel(start)}` : end ? `Sampai ${dateLabel(end)}` : "Semua tanggal";
         const left = 14;
         const right = 196;
@@ -1520,7 +1535,7 @@
         const cards = [
           { label:"TOTAL PEMASUKAN", value:income, background:[236,253,245], color:[5,120,80] },
           { label:"TOTAL PENGELUARAN", value:expense, background:[255,241,242], color:[190,18,60] },
-          { label:"SALDO PERIODE", value:income-expense, background:[239,246,255], color:[20,54,104] }
+          { label:"SISA SALDO", value:openingBalance+income-expense, detail:`Termasuk saldo awal ${rupiah(openingBalance)}`, background:[239,246,255], color:[20,54,104] }
         ];
         cards.forEach((card,index) => {
           const x = left+index*(cardWidth+cardGap);
@@ -1529,6 +1544,10 @@
           doc.text(card.label,x+4,47);
           doc.setFontSize(10); doc.setTextColor(...card.color);
           doc.text(doc.splitTextToSize(rupiah(card.value),cardWidth-8),x+4,57);
+          if (card.detail) {
+            doc.setFont("helvetica","normal"); doc.setFontSize(6); doc.setTextColor(71,85,105);
+            doc.text(doc.splitTextToSize(card.detail,cardWidth-8),x+4,62);
+          }
         });
         doc.setFont("helvetica","bold"); doc.setFontSize(10); doc.setTextColor(20,54,104);
         doc.text("PERBANDINGAN PEMASUKAN & PENGELUARAN",left,75);
