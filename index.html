@@ -76,9 +76,13 @@
           <div class="rounded-2xl bg-rose-50 p-5"><p class="text-sm text-rose-800">Total pengeluaran</p><p id="boss-ledger-expense-total" class="mt-2 text-xl font-bold text-rose-900"></p></div>
           <div class="rounded-2xl bg-slate-900 p-5 text-white"><p class="text-sm text-slate-300">Saldo</p><p id="boss-ledger-balance" class="mt-2 text-xl font-bold"></p></div>
         </section>
-        <section class="rounded-2xl bg-white p-5 shadow-sm"><h2 class="mb-5 font-bold">Grafik Buku Besar</h2><div id="boss-ledger-chart" class="space-y-4"></div></section>
+        <section class="rounded-2xl bg-white p-5 shadow-sm"><h2 class="mb-4 font-bold">Tabel Pemasukan</h2><div class="overflow-x-auto"><table class="w-full min-w-[720px] text-left text-sm"><thead class="text-xs uppercase text-slate-500"><tr><th class="py-2 pr-3">Tanggal</th><th class="py-2 pr-3">Nama penerima</th><th class="py-2 pr-3">Keterangan</th><th class="py-2 pr-3 text-right">Nominal</th><th class="py-2 text-right">Bukti</th></tr></thead><tbody id="boss-ledger-income-rows"></tbody></table></div><p id="boss-ledger-income-empty" class="hidden py-6 text-center text-sm text-slate-500">Belum ada data pemasukan.</p></section>
         <section class="rounded-2xl bg-white p-5 shadow-sm"><h2 class="mb-4 font-bold">Riwayat transaksi</h2><div class="overflow-x-auto"><table class="w-full min-w-[650px] text-left text-sm"><thead class="text-xs uppercase text-slate-500"><tr><th class="py-2 pr-3">Tanggal</th><th class="py-2 pr-3">Jenis / penerima</th><th class="py-2 pr-3">Keterangan</th><th class="py-2 text-right">Nominal</th></tr></thead><tbody id="boss-ledger-rows"></tbody></table></div><p id="boss-ledger-empty" class="hidden py-6 text-center text-sm text-slate-500">Belum ada transaksi Buku Besar.</p></section>
       </div>
+    </div>
+    <div id="boss-ledger-photo-dialog" class="fixed inset-0 z-[70] hidden items-center justify-center bg-slate-950/80 p-4" role="dialog" aria-modal="true" aria-label="Bukti foto pemasukan Buku Besar">
+      <button id="boss-ledger-photo-close" type="button" class="absolute right-4 top-4 rounded-lg bg-white px-3 py-2 text-sm font-bold text-slate-900">Tutup</button>
+      <img id="boss-ledger-photo" alt="Bukti foto pemasukan" class="max-h-[90vh] max-w-full rounded-xl object-contain">
     </div>
   </section>
   <div id="app-shell" class="hidden min-h-screen md:flex">
@@ -453,6 +457,7 @@
       let bossReportRefreshTimer = null;
       let bossReportRefreshInFlight = false;
       let activeBossReportToken = "";
+      let activeBossLedgerToken = "";
       let bossLedgerRefreshInFlight = false;
       let bossLedgerData = { incomes:[], expenses:[] };
       let activeBossReportType = "overall";
@@ -1206,8 +1211,9 @@
         bossReportRefreshTimer = window.setInterval(() => loadBossReport(token,true),30000);
       }
       function renderBossLedger() {
+        const incomes = [...bossLedgerData.incomes].sort((a,b) => String(b.date || "").localeCompare(String(a.date || "")));
         const entries = [
-          ...bossLedgerData.incomes.map((item) => ({
+          ...incomes.map((item) => ({
             id:item.id,date:item.date,type:"income",recipient:item.recipient,
             description:item.description,amount:item.amount
           })),
@@ -1221,14 +1227,8 @@
         $("boss-ledger-income-total").textContent = rupiah(income);
         $("boss-ledger-expense-total").textContent = rupiah(expense);
         $("boss-ledger-balance").textContent = rupiah(income-expense);
-        const max = Math.max(income,expense,1);
-        $("boss-ledger-chart").innerHTML = [
-          { label:"Pemasukan",amount:income,color:"bg-emerald-500" },
-          { label:"Pengeluaran",amount:expense,color:"bg-rose-500" }
-        ].map((item) => {
-          const percentage = Math.round(item.amount/max*100);
-          return `<div><div class="mb-1.5 flex flex-wrap items-baseline justify-between gap-2"><span class="text-sm font-medium text-slate-700">${item.label}</span><span class="text-sm font-bold text-slate-900">${rupiah(item.amount)}</span></div><div class="h-3 overflow-hidden rounded-full bg-slate-100" role="progressbar" aria-label="${item.label}" aria-valuemin="0" aria-valuemax="100" aria-valuenow="${percentage}"><div class="h-full ${item.color}" style="width:${percentage}%"></div></div></div>`;
-        }).join("");
+        $("boss-ledger-income-rows").innerHTML = incomes.map((item) => `<tr class="border-t border-slate-100 align-top"><td class="py-3 pr-3">${dateLabel(item.date)}</td><td class="py-3 pr-3 font-medium">${escapeHtml(item.recipient || "-")}</td><td class="py-3 pr-3">${escapeHtml(item.description || "-")}</td><td class="py-3 pr-3 text-right font-semibold">${rupiah(item.amount)}</td><td class="py-3 text-right">${item.hasPhoto ? `<button type="button" class="text-xs font-semibold text-amber-700 hover:text-amber-900" data-boss-ledger-photo="${escapeHtml(item.id)}">Lihat bukti</button>` : '<span class="text-xs text-slate-400">Tidak ada</span>'}</td></tr>`).join("");
+        $("boss-ledger-income-empty").classList.toggle("hidden",incomes.length > 0);
         $("boss-ledger-rows").innerHTML = entries.map((item) => `<tr class="border-t border-slate-100 align-top"><td class="py-3 pr-3">${dateLabel(item.date)}</td><td class="py-3 pr-3"><span class="font-semibold ${item.type === "income" ? "text-emerald-700" : "text-rose-700"}">${item.type === "income" ? "Pemasukan" : "Pengeluaran"}</span><div class="text-xs text-slate-500">${escapeHtml(item.type === "income" ? item.recipient : `${item.category} · ${item.recipient}`)}</div></td><td class="py-3 pr-3">${escapeHtml(item.description)}</td><td class="py-3 text-right font-semibold">${rupiah(item.amount)}</td></tr>`).join("");
         $("boss-ledger-empty").classList.toggle("hidden",entries.length > 0);
         $("boss-ledger-content").classList.remove("hidden");
@@ -1278,6 +1278,7 @@
           $("boss-ledger-error").classList.remove("hidden");
           return;
         }
+        activeBossLedgerToken = token;
         if (!window.supabase || typeof window.supabase.createClient !== "function") {
           $("boss-ledger-refresh-status").textContent = "Layanan tidak tersedia";
           $("boss-ledger-error").textContent = "Layanan Buku Besar gagal dimuat. Periksa koneksi internet, lalu buka kembali tautan.";
@@ -1290,6 +1291,39 @@
         await loadBossLedger(token);
         bossReportRefreshTimer = window.setInterval(() => loadBossLedger(token,true),30000);
       }
+      async function handleBossLedgerPhotoClick(event) {
+        const button = event.target.closest("[data-boss-ledger-photo]");
+        if (!button) return;
+        const income = bossLedgerData.incomes.find((item) => item.id === button.dataset.bossLedgerPhoto);
+        if (!income || !income.hasPhoto) return;
+        button.disabled = true;
+        try {
+          const { data,error } = await supabaseClient.rpc("get_boss_ledger_income_photo",{
+            share_token:activeBossLedgerToken,
+            income_id:income.id
+          });
+          if (error) throw error;
+          if (typeof data !== "string" || !data.startsWith("data:image/")) throw new Error("Foto bukti tidak tersedia.");
+          $("boss-ledger-photo").src = data;
+          $("boss-ledger-photo-dialog").classList.remove("hidden");
+          $("boss-ledger-photo-dialog").classList.add("flex");
+        } catch (error) {
+          console.error("Gagal memuat bukti foto pemasukan Buku Besar.",error);
+          notify("Bukti foto gagal dimuat. Periksa koneksi internet atau minta admin memeriksa data foto.",true);
+        } finally {
+          button.disabled = false;
+        }
+      }
+      $("boss-ledger-income-rows").addEventListener("click",handleBossLedgerPhotoClick);
+      function closeBossLedgerPhoto() {
+        $("boss-ledger-photo-dialog").classList.add("hidden");
+        $("boss-ledger-photo-dialog").classList.remove("flex");
+        $("boss-ledger-photo").removeAttribute("src");
+      }
+      $("boss-ledger-photo-close").addEventListener("click",closeBossLedgerPhoto);
+      $("boss-ledger-photo-dialog").addEventListener("click",(event) => {
+        if (event.target === $("boss-ledger-photo-dialog")) closeBossLedgerPhoto();
+      });
       async function handleBossPhotoClick(event) {
         const button = event.target.closest("[data-boss-photo]");
         if (!button) return;
@@ -3019,6 +3053,7 @@
           $("pdf-download-panel").classList.remove("flex");
         }
         if (!$("boss-report-photo-dialog").classList.contains("hidden")) closeBossReportPhoto();
+        if (!$("boss-ledger-photo-dialog").classList.contains("hidden")) closeBossLedgerPhoto();
       });
       window.addEventListener("pagehide",() => {
         if (activePdfUrl) URL.revokeObjectURL(activePdfUrl);
