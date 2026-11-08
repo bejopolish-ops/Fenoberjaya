@@ -63,6 +63,24 @@
       </div>
     </div>
   </section>
+  <section id="public-ledger-screen" class="hidden min-h-screen px-4 py-6 sm:px-6 lg:px-8">
+    <div class="mx-auto max-w-7xl space-y-6">
+      <header class="flex flex-wrap items-center justify-between gap-4 rounded-2xl bg-slate-900 p-5 text-white shadow-sm sm:p-6">
+        <div class="flex items-center gap-4"><div class="grid h-14 w-14 shrink-0 place-items-center overflow-hidden rounded-xl bg-white p-1"><img src="./logo.png" alt="Logo FENO BERJAYA" class="h-full w-full object-contain"></div><div><p class="text-sm text-slate-300">FB Workshop System</p><h1 class="text-2xl font-bold">Buku Besar</h1><p class="mt-1 text-sm text-slate-300">Akses bos · hanya-baca</p></div></div>
+        <p id="boss-ledger-refresh-status" class="text-sm text-slate-300" role="status">Memuat Buku Besar...</p>
+      </header>
+      <p id="boss-ledger-error" class="hidden rounded-xl border border-rose-200 bg-rose-50 p-4 text-sm text-rose-800" role="alert"></p>
+      <div id="boss-ledger-content" class="hidden space-y-6">
+        <section class="grid gap-3 sm:grid-cols-3">
+          <div class="rounded-2xl bg-emerald-50 p-5"><p class="text-sm text-emerald-800">Total pemasukan</p><p id="boss-ledger-income-total" class="mt-2 text-xl font-bold text-emerald-900"></p></div>
+          <div class="rounded-2xl bg-rose-50 p-5"><p class="text-sm text-rose-800">Total pengeluaran</p><p id="boss-ledger-expense-total" class="mt-2 text-xl font-bold text-rose-900"></p></div>
+          <div class="rounded-2xl bg-slate-900 p-5 text-white"><p class="text-sm text-slate-300">Saldo</p><p id="boss-ledger-balance" class="mt-2 text-xl font-bold"></p></div>
+        </section>
+        <section class="rounded-2xl bg-white p-5 shadow-sm"><h2 class="mb-5 font-bold">Grafik Buku Besar</h2><div id="boss-ledger-chart" class="space-y-4"></div></section>
+        <section class="rounded-2xl bg-white p-5 shadow-sm"><h2 class="mb-4 font-bold">Riwayat transaksi</h2><div class="overflow-x-auto"><table class="w-full min-w-[650px] text-left text-sm"><thead class="text-xs uppercase text-slate-500"><tr><th class="py-2 pr-3">Tanggal</th><th class="py-2 pr-3">Jenis / penerima</th><th class="py-2 pr-3">Keterangan</th><th class="py-2 text-right">Nominal</th></tr></thead><tbody id="boss-ledger-rows"></tbody></table></div><p id="boss-ledger-empty" class="hidden py-6 text-center text-sm text-slate-500">Belum ada transaksi Buku Besar.</p></section>
+      </div>
+    </div>
+  </section>
   <div id="app-shell" class="hidden min-h-screen md:flex">
     <aside class="no-print w-full min-w-0 max-w-full overflow-hidden bg-slate-950 text-slate-200 md:sticky md:top-0 md:h-screen md:flex md:w-64 md:shrink-0 md:flex-col">
       <div class="flex items-center gap-3 border-b border-slate-800 px-5 py-5">
@@ -77,6 +95,7 @@
         <button class="nav-btn shrink-0 whitespace-nowrap rounded-lg px-4 py-3 text-left text-sm hover:bg-slate-800" data-view="goods">▣ &nbsp; Barang Jadi</button>
         <button class="nav-btn shrink-0 whitespace-nowrap rounded-lg px-4 py-3 text-left text-sm hover:bg-slate-800" data-view="shipments">⇧ &nbsp; Surat Jalan</button>
         <button class="nav-btn shrink-0 whitespace-nowrap rounded-lg px-4 py-3 text-left text-sm hover:bg-slate-800" data-view="cash-notes">▤ &nbsp; Nota Uang</button>
+        <button class="nav-btn shrink-0 whitespace-nowrap rounded-lg px-4 py-3 text-left text-sm hover:bg-slate-800" data-view="ledger">▤ &nbsp; Buku Besar</button>
         <button class="nav-btn shrink-0 whitespace-nowrap rounded-lg px-4 py-3 text-left text-sm hover:bg-slate-800" data-view="reports">▤ &nbsp; Laporan PDF</button>
       </nav>
       <div class="mt-auto hidden border-t border-slate-800 p-4 text-xs text-slate-500 md:block">Data tersinkron ke database workshop.</div>
@@ -266,6 +285,37 @@
         </div>
       </section>
 
+      <section id="view-ledger" class="app-view hidden space-y-6">
+        <div class="rounded-2xl bg-amber-50 p-4 text-sm text-amber-900"><p class="font-bold">Buku Besar Administrasi</p><p class="mt-1">Catatan pemasukan dan pengeluaran di halaman ini tidak dimasukkan ke laporan workshop umum. Bagikan tautan viewer khusus Buku Besar di bawah ini jika bos perlu melihatnya.</p></div>
+        <div class="grid min-w-0 gap-6 xl:grid-cols-[minmax(0,0.8fr)_minmax(0,1.2fr)]">
+          <form id="ledger-form" class="space-y-4 rounded-2xl bg-white p-5 shadow-sm">
+            <div><h2 id="ledger-form-title" class="text-lg font-bold">Input transaksi</h2><p class="text-sm text-slate-500">Catat transaksi langsung ke Buku Besar.</p></div>
+            <input id="ledger-id" type="hidden">
+            <label class="block text-sm font-medium">Tanggal<input id="ledger-date" type="date" required class="field mt-1"></label>
+            <label class="block text-sm font-medium">Nama penerima<input id="ledger-recipient" required maxlength="100" class="field mt-1" placeholder="Nama penerima pemasukan"></label>
+            <label class="block text-sm font-medium">Keterangan<input id="ledger-description" required maxlength="240" class="field mt-1" placeholder="Rincian transaksi"></label>
+            <label class="block text-sm font-medium">Nominal (Rp)<input id="ledger-amount" type="number" min="1" step="1" required class="field mt-1" placeholder="Contoh: 500000"></label>
+            <label class="block text-sm font-medium">Bukti foto (opsional)<input id="ledger-photo" type="file" accept="image/*" class="mt-1 block w-full rounded-lg border border-slate-200 p-2 text-sm"><span class="mt-1 block text-xs font-normal text-slate-500">Foto dikompres agar penyimpanan lebih hemat.</span></label>
+            <div id="ledger-photo-preview-wrap" class="hidden space-y-2"><img id="ledger-photo-preview" alt="Preview bukti pemasukan" class="max-h-48 rounded-lg border border-slate-200 object-contain"><button id="ledger-photo-remove" type="button" class="text-sm font-semibold text-rose-600 hover:text-rose-800">Hapus bukti foto</button></div>
+            <div class="flex gap-2"><button id="ledger-submit" type="submit" class="flex-1 rounded-lg bg-amber-400 px-4 py-2.5 text-sm font-bold text-slate-950 hover:bg-amber-300">Simpan Transaksi</button><button id="ledger-cancel" type="button" class="hidden rounded-lg border border-slate-300 px-4 py-2.5 text-sm font-semibold text-slate-700 hover:bg-slate-50">Batal edit</button></div>
+          </form>
+          <div class="space-y-4">
+            <section class="rounded-2xl bg-white p-5 shadow-sm">
+              <div class="mb-4 flex flex-wrap items-end justify-between gap-3"><div><h2 class="font-bold">Periode Buku Besar</h2><p class="text-sm text-slate-500">Ringkasan dan PDF mengikuti tanggal yang dipilih.</p></div><button id="ledger-pdf" type="button" class="rounded-lg bg-slate-900 px-4 py-2.5 text-sm font-bold text-white hover:bg-slate-700">Unduh PDF Buku Besar</button></div>
+              <div class="grid gap-3 sm:grid-cols-2"><label class="text-sm font-medium">Dari tanggal<input id="ledger-filter-start" type="date" class="field mt-1"></label><label class="text-sm font-medium">Sampai tanggal<input id="ledger-filter-end" type="date" class="field mt-1"></label></div>
+              <p id="ledger-range-error" class="mt-3 hidden text-sm text-rose-700" role="alert"></p>
+              <div class="mt-4 grid gap-3 sm:grid-cols-3"><div class="rounded-xl bg-emerald-50 p-3"><p class="text-xs text-emerald-800">Total pemasukan</p><p id="ledger-total-income" class="mt-1 font-bold text-emerald-900"></p></div><div class="rounded-xl bg-rose-50 p-3"><p class="text-xs text-rose-800">Total pengeluaran</p><p id="ledger-total-expense" class="mt-1 font-bold text-rose-900"></p></div><div class="rounded-xl bg-slate-100 p-3"><p class="text-xs text-slate-600">Saldo periode</p><p id="ledger-total-balance" class="mt-1 font-bold text-slate-900"></p></div></div>
+            </section>
+            <section class="space-y-4 rounded-2xl border border-amber-200 bg-amber-50 p-5 shadow-sm">
+              <div><h2 class="font-bold text-slate-900">Tautan Buku Besar untuk Bos</h2><p class="mt-1 text-sm text-slate-600">Tautan hanya-baca menampilkan pemasukan dan pengeluaran Buku Besar. Siapa pun yang memegang tautan dapat melihatnya; cabut akses untuk menonaktifkannya.</p></div>
+              <div class="flex flex-wrap gap-2"><button id="ledger-share-create" type="button" class="rounded-lg bg-slate-900 px-4 py-2 text-sm font-semibold text-white hover:bg-slate-700">Buat / perbarui tautan Bos</button><button id="ledger-share-copy" type="button" class="hidden rounded-lg border border-slate-300 bg-white px-4 py-2 text-sm font-semibold hover:bg-slate-50">Salin tautan</button><button id="ledger-share-revoke" type="button" class="hidden rounded-lg border border-rose-200 bg-white px-4 py-2 text-sm font-semibold text-rose-700 hover:bg-rose-50">Cabut akses</button></div>
+              <input id="ledger-share-url" readonly class="hidden field bg-white text-sm" aria-label="Tautan Buku Besar untuk bos">
+            </section>
+            <section class="rounded-2xl bg-white p-5 shadow-sm"><h2 class="mb-4 font-bold">Riwayat transaksi</h2><div class="overflow-x-auto"><table class="w-full min-w-[650px] text-left text-sm"><thead class="text-xs uppercase text-slate-500"><tr><th class="py-2 pr-3">Tanggal</th><th class="py-2 pr-3">Jenis / penerima</th><th class="py-2 pr-3">Keterangan</th><th class="py-2 pr-3 text-right">Nominal</th><th class="py-2 text-right">Aksi</th></tr></thead><tbody id="ledger-rows"></tbody></table></div><p id="ledger-empty" class="hidden py-6 text-center text-sm text-slate-500">Belum ada transaksi pada periode ini.</p></section>
+          </div>
+        </div>
+      </section>
+
       <section id="view-reports" class="app-view hidden space-y-6">
         <div class="space-y-5">
           <div class="flex flex-wrap items-center justify-between gap-4 rounded-2xl bg-slate-900 p-5 text-white shadow-sm sm:p-6">
@@ -403,12 +453,16 @@
       let bossReportRefreshTimer = null;
       let bossReportRefreshInFlight = false;
       let activeBossReportToken = "";
+      let bossLedgerRefreshInFlight = false;
+      let bossLedgerData = { incomes:[], expenses:[] };
       let activeBossReportType = "overall";
       let activeBossReportStart = "";
       let activeBossReportEnd = "";
       $("shipment-date").value = today;
       $("cash-note-date").value = today;
       let pendingPhoto = "";
+      let pendingLedgerPhoto = "";
+      let pendingLedgerPhotoRemoved = false;
       let activePdfUrl = "";
       let activeReportTab = "detail";
       const selectedCashNoteIds = new Set();
@@ -422,7 +476,7 @@
         return new Date(date.getTime() - offset * 60000).toISOString().slice(0, 10);
       }
       function emptyState() {
-        return { expenses: [], goods: [], shipments: [], cashNotes: [], pieceworkRates: [], employees: [], attendance: [], reportShareToken:"" };
+        return { expenses: [], goods: [], shipments: [], cashNotes: [], ledgerEntries: [], pieceworkRates: [], employees: [], attendance: [], reportShareToken:"", ledgerShareToken:"" };
       }
       function normalizeState(parsed) {
         if (!parsed || typeof parsed !== "object" || Array.isArray(parsed)) {
@@ -436,10 +490,15 @@
             if (typeof note.number !== "string") return note;
             return { ...note, number:note.number.replace(/^NT\/BEJO\//i,"NT/FB/") };
           }) : [],
+          ledgerEntries: Array.isArray(parsed.ledgerEntries) ? parsed.ledgerEntries.map((entry) => ({
+            ...entry,
+            recipient:typeof entry.recipient === "string" ? entry.recipient : typeof entry.category === "string" ? entry.category : ""
+          })) : [],
           pieceworkRates: Array.isArray(parsed.pieceworkRates) ? parsed.pieceworkRates : [],
           employees: Array.isArray(parsed.employees) ? parsed.employees : [],
           attendance: Array.isArray(parsed.attendance) ? parsed.attendance : [],
-          reportShareToken: typeof parsed.reportShareToken === "string" ? parsed.reportShareToken : ""
+          reportShareToken: typeof parsed.reportShareToken === "string" ? parsed.reportShareToken : "",
+          ledgerShareToken: typeof parsed.ledgerShareToken === "string" ? parsed.ledgerShareToken : ""
         };
       }
       function mergeStates(cloudState,localState) {
@@ -451,6 +510,7 @@
           merged[key] = [...records.values()];
         }
         merged.reportShareToken = cloudState.reportShareToken !== undefined ? cloudState.reportShareToken : localState.reportShareToken;
+        merged.ledgerShareToken = cloudState.ledgerShareToken !== undefined ? cloudState.ledgerShareToken : localState.ledgerShareToken;
         return merged;
       }
       function readLocalStateForMigration() {
@@ -628,13 +688,15 @@
         renderGoods();
         renderShipments();
         renderCashNotes();
+        renderLedger();
+        renderLedgerShareLink();
         renderReports();
         renderBossReportLink();
       }
       function setView(view) {
         document.querySelectorAll(".app-view").forEach((section) => section.classList.toggle("hidden", section.id !== `view-${view}`));
         document.querySelectorAll(".nav-btn").forEach((button) => button.classList.toggle("active", button.dataset.view === view));
-        const titles = { dashboard:"Dashboard", attendance:"Absensi Karyawan", expenses:"Pengeluaran", goods:"Barang Jadi", shipments:"Surat Jalan", "cash-notes":"Nota Pengambilan Uang", reports:"Laporan PDF" };
+        const titles = { dashboard:"Dashboard", attendance:"Absensi Karyawan", expenses:"Pengeluaran", goods:"Barang Jadi", shipments:"Surat Jalan", "cash-notes":"Nota Pengambilan Uang", ledger:"Buku Besar", reports:"Laporan PDF" };
         $("page-title").textContent = titles[view] || "Dashboard";
       }
       function renderDashboard() {
@@ -756,6 +818,56 @@
         $("cash-note-selection-count").textContent = `Terpilih: ${selectedCashNoteIds.size}/4`;
         $("cash-note-print-full").disabled = selectedCashNoteIds.size === 0;
         $("cash-note-print-quarter").disabled = selectedCashNoteIds.size === 0;
+      }
+      function ledgerEntriesForPeriod() {
+        const start = $("ledger-filter-start").value;
+        const end = $("ledger-filter-end").value;
+        const incomeEntries = state.ledgerEntries
+          .filter((entry) => entry.type === "income")
+          .map((entry) => ({ ...entry, source:"income" }));
+        const expenseEntries = state.expenses.map((entry) => ({
+          id:`expense-${entry.id}`,
+          date:entry.date,
+          type:"expense",
+          category:TYPE_LABELS[entry.type] || entry.type,
+          description:entry.note ? `${entry.worker} — ${entry.note}` : entry.worker,
+          amount:entry.amount,
+          createdAt:entry.createdAt || "",
+          source:"expense"
+        }));
+        return [...incomeEntries,...expenseEntries]
+          .filter((entry) => (!start || entry.date >= start) && (!end || entry.date <= end))
+          .sort((a,b) => b.date.localeCompare(a.date) || String(b.createdAt || "").localeCompare(String(a.createdAt || "")));
+      }
+      function renderLedger() {
+        const start = $("ledger-filter-start").value;
+        const end = $("ledger-filter-end").value;
+        const invalidRange = Boolean(start && end && start > end);
+        $("ledger-range-error").classList.toggle("hidden",!invalidRange);
+        $("ledger-range-error").textContent = invalidRange ? "Tanggal awal tidak boleh melewati tanggal akhir." : "";
+        const entries = invalidRange ? [] : ledgerEntriesForPeriod();
+        const income = entries.filter((entry) => entry.type === "income").reduce((sum,entry) => sum + Number(entry.amount),0);
+        const expense = entries.filter((entry) => entry.type === "expense").reduce((sum,entry) => sum + Number(entry.amount),0);
+        $("ledger-total-income").textContent = rupiah(income);
+        $("ledger-total-expense").textContent = rupiah(expense);
+        $("ledger-total-balance").textContent = rupiah(income - expense);
+        $("ledger-rows").innerHTML = entries.map((entry) => `<tr class="border-t border-slate-100 align-top"><td class="py-3 pr-3">${dateLabel(entry.date)}</td><td class="py-3 pr-3"><span class="font-semibold ${entry.type === "income" ? "text-emerald-700" : "text-rose-700"}">${entry.type === "income" ? "Pemasukan" : "Pengeluaran"}</span><div class="text-xs text-slate-500">${escapeHtml(entry.type === "income" ? entry.recipient : entry.category)}</div></td><td class="py-3 pr-3">${escapeHtml(entry.description)}</td><td class="py-3 pr-3 text-right font-semibold">${rupiah(entry.amount)}</td><td class="py-3 text-right whitespace-nowrap">${entry.source === "income" ? `${entry.photo ? `<button type="button" class="mr-2 text-xs font-semibold text-amber-700 hover:text-amber-900" data-ledger-photo="${escapeHtml(entry.id)}">Lihat bukti</button>` : ""}<button type="button" class="mr-2 text-xs font-semibold text-slate-600 hover:text-slate-900" data-edit-ledger="${escapeHtml(entry.id)}">Edit</button><button type="button" class="text-xs font-semibold text-rose-600 hover:text-rose-800" data-delete-ledger="${escapeHtml(entry.id)}">Hapus</button>` : '<span class="text-xs text-slate-400">Dari menu Pengeluaran</span>'}</td></tr>`).join("");
+        $("ledger-empty").classList.toggle("hidden",entries.length > 0);
+        $("ledger-pdf").disabled = invalidRange;
+      }
+      function renderLedgerShareLink() {
+        const hasToken = /^[a-f0-9]{64}$/.test(state.ledgerShareToken);
+        const input = $("ledger-share-url");
+        input.classList.toggle("hidden",!hasToken);
+        $("ledger-share-copy").classList.toggle("hidden",!hasToken);
+        $("ledger-share-revoke").classList.toggle("hidden",!hasToken);
+        input.value = hasToken ? createBossLedgerUrl(state.ledgerShareToken) : "";
+      }
+      function createBossLedgerUrl(token) {
+        const url = new URL(location.href);
+        url.search = "";
+        url.hash = new URLSearchParams({ "ledger-viewer":token }).toString();
+        return url.href;
       }
       function resetCashNoteForm() {
         $("cash-note-form").reset();
@@ -1093,6 +1205,91 @@
         await loadBossReport(token);
         bossReportRefreshTimer = window.setInterval(() => loadBossReport(token,true),30000);
       }
+      function renderBossLedger() {
+        const entries = [
+          ...bossLedgerData.incomes.map((item) => ({
+            id:item.id,date:item.date,type:"income",recipient:item.recipient,
+            description:item.description,amount:item.amount
+          })),
+          ...bossLedgerData.expenses.map((item) => ({
+            id:item.id,date:item.date,type:"expense",recipient:item.worker,
+            description:item.note || "-",amount:item.amount,category:item.type
+          }))
+        ].sort((a,b) => String(b.date || "").localeCompare(String(a.date || "")));
+        const income = entries.filter((item) => item.type === "income").reduce((sum,item) => sum + Number(item.amount || 0),0);
+        const expense = entries.filter((item) => item.type === "expense").reduce((sum,item) => sum + Number(item.amount || 0),0);
+        $("boss-ledger-income-total").textContent = rupiah(income);
+        $("boss-ledger-expense-total").textContent = rupiah(expense);
+        $("boss-ledger-balance").textContent = rupiah(income-expense);
+        const max = Math.max(income,expense,1);
+        $("boss-ledger-chart").innerHTML = [
+          { label:"Pemasukan",amount:income,color:"bg-emerald-500" },
+          { label:"Pengeluaran",amount:expense,color:"bg-rose-500" }
+        ].map((item) => {
+          const percentage = Math.round(item.amount/max*100);
+          return `<div><div class="mb-1.5 flex flex-wrap items-baseline justify-between gap-2"><span class="text-sm font-medium text-slate-700">${item.label}</span><span class="text-sm font-bold text-slate-900">${rupiah(item.amount)}</span></div><div class="h-3 overflow-hidden rounded-full bg-slate-100" role="progressbar" aria-label="${item.label}" aria-valuemin="0" aria-valuemax="100" aria-valuenow="${percentage}"><div class="h-full ${item.color}" style="width:${percentage}%"></div></div></div>`;
+        }).join("");
+        $("boss-ledger-rows").innerHTML = entries.map((item) => `<tr class="border-t border-slate-100 align-top"><td class="py-3 pr-3">${dateLabel(item.date)}</td><td class="py-3 pr-3"><span class="font-semibold ${item.type === "income" ? "text-emerald-700" : "text-rose-700"}">${item.type === "income" ? "Pemasukan" : "Pengeluaran"}</span><div class="text-xs text-slate-500">${escapeHtml(item.type === "income" ? item.recipient : `${item.category} · ${item.recipient}`)}</div></td><td class="py-3 pr-3">${escapeHtml(item.description)}</td><td class="py-3 text-right font-semibold">${rupiah(item.amount)}</td></tr>`).join("");
+        $("boss-ledger-empty").classList.toggle("hidden",entries.length > 0);
+        $("boss-ledger-content").classList.remove("hidden");
+      }
+      async function loadBossLedger(token,isRefresh = false) {
+        if (bossLedgerRefreshInFlight) return;
+        bossLedgerRefreshInFlight = true;
+        try {
+          const { data,error } = await supabaseClient.rpc("get_boss_ledger",{ share_token:token });
+          if (error) throw error;
+          if (!data) {
+            bossLedgerData = { incomes:[], expenses:[] };
+            $("boss-ledger-content").classList.add("hidden");
+            $("boss-ledger-error").textContent = "Tautan Buku Besar tidak valid atau aksesnya sudah dicabut. Minta admin membuat tautan baru.";
+            $("boss-ledger-error").classList.remove("hidden");
+            $("boss-ledger-refresh-status").textContent = "Akses tidak tersedia";
+            return;
+          }
+          if (!Array.isArray(data.incomes) || !Array.isArray(data.expenses)) throw new Error("Format data Buku Besar viewer tidak valid.");
+          bossLedgerData = data;
+          renderBossLedger();
+          $("boss-ledger-error").classList.add("hidden");
+          $("boss-ledger-refresh-status").textContent = `Diperbarui ${new Intl.DateTimeFormat("id-ID",{ hour:"2-digit", minute:"2-digit" }).format(new Date())} · pembaruan otomatis 30 detik`;
+        } catch (error) {
+          console.error("Gagal memuat Buku Besar viewer bos.",error);
+          $("boss-ledger-error").textContent = isRefresh
+            ? "Pembaruan Buku Besar gagal. Periksa koneksi internet; data yang sudah tampil mungkin belum terbaru."
+            : "Buku Besar belum dapat dimuat. Admin perlu memperbarui konfigurasi viewer di Supabase dan memastikan tautan masih aktif.";
+          $("boss-ledger-error").classList.remove("hidden");
+          $("boss-ledger-refresh-status").textContent = "Gagal memuat Buku Besar";
+        } finally {
+          bossLedgerRefreshInFlight = false;
+        }
+      }
+      async function initializeBossLedger() {
+        document.body.dataset.bossViewer = "true";
+        $("login-screen").classList.add("hidden");
+        $("app-shell").classList.add("hidden");
+        $("public-report-screen").classList.add("hidden");
+        $("public-ledger-screen").classList.remove("hidden");
+        document.title = "Buku Besar - FENO BERJAYA";
+        const route = new URLSearchParams(location.hash.slice(1));
+        const token = route.get("ledger-viewer") || "";
+        if (!/^[a-f0-9]{64}$/.test(token)) {
+          $("boss-ledger-refresh-status").textContent = "Tautan tidak valid";
+          $("boss-ledger-error").textContent = "Tautan Buku Besar tidak valid. Minta admin mengirimkan tautan yang benar.";
+          $("boss-ledger-error").classList.remove("hidden");
+          return;
+        }
+        if (!window.supabase || typeof window.supabase.createClient !== "function") {
+          $("boss-ledger-refresh-status").textContent = "Layanan tidak tersedia";
+          $("boss-ledger-error").textContent = "Layanan Buku Besar gagal dimuat. Periksa koneksi internet, lalu buka kembali tautan.";
+          $("boss-ledger-error").classList.remove("hidden");
+          return;
+        }
+        supabaseClient = window.supabase.createClient(SUPABASE_URL,SUPABASE_ANON_KEY,{
+          auth:{ persistSession:false,autoRefreshToken:false,detectSessionInUrl:false }
+        });
+        await loadBossLedger(token);
+        bossReportRefreshTimer = window.setInterval(() => loadBossLedger(token,true),30000);
+      }
       async function handleBossPhotoClick(event) {
         const button = event.target.closest("[data-boss-photo]");
         if (!button) return;
@@ -1204,6 +1401,122 @@
           console.error("PDF berhasil diminta tetapi gagal disiapkan untuk diunduh.", error);
           notify("File PDF gagal disiapkan. Periksa ruang penyimpanan browser lalu coba lagi.", true);
         }
+      }
+      async function createLedgerPdf() {
+        if (!pdfAvailable()) return;
+        const start = $("ledger-filter-start").value;
+        const end = $("ledger-filter-end").value;
+        if (start && end && start > end) {
+          notify("Tanggal awal tidak boleh melewati tanggal akhir.",true);
+          return;
+        }
+        const logo = await getPdfLogoDataUrl();
+        if (!logo) return;
+        const { jsPDF } = window.jspdf;
+        const doc = new jsPDF({ unit:"mm", format:"a4" });
+        const entries = ledgerEntriesForPeriod().sort((a,b) => a.date.localeCompare(b.date) || String(a.createdAt || "").localeCompare(String(b.createdAt || "")));
+        const income = entries.filter((entry) => entry.type === "income").reduce((sum,entry) => sum + Number(entry.amount),0);
+        const expense = entries.filter((entry) => entry.type === "expense").reduce((sum,entry) => sum + Number(entry.amount),0);
+        const rangeLabel = start && end ? `${dateLabel(start)} - ${dateLabel(end)}` : start ? `Mulai ${dateLabel(start)}` : end ? `Sampai ${dateLabel(end)}` : "Semua tanggal";
+        const left = 14;
+        const right = 196;
+        const drawHeader = () => {
+          doc.addImage(logo,"JPEG",left,8,18,18);
+          doc.setFont("helvetica","bold"); doc.setFontSize(15); doc.setTextColor(20,54,104);
+          doc.text("BUKU BESAR",38,16);
+          doc.setFont("helvetica","normal"); doc.setFontSize(9); doc.setTextColor(71,85,105);
+          doc.text(`Periode: ${rangeLabel}`,38,22);
+          doc.text(`Dicetak ${dateLabel(today)}`,right,22,{align:"right"});
+          doc.setDrawColor(20,54,104); doc.setLineWidth(0.7); doc.line(left,31,right,31);
+          doc.setDrawColor(245,158,11); doc.setLineWidth(0.35); doc.line(left,33,right,33);
+        };
+        drawHeader();
+        const cardGap = 4;
+        const cardWidth = (right-left-cardGap*2)/3;
+        const cards = [
+          { label:"TOTAL PEMASUKAN", value:income, background:[236,253,245], color:[5,120,80] },
+          { label:"TOTAL PENGELUARAN", value:expense, background:[255,241,242], color:[190,18,60] },
+          { label:"SALDO PERIODE", value:income-expense, background:[239,246,255], color:[20,54,104] }
+        ];
+        cards.forEach((card,index) => {
+          const x = left+index*(cardWidth+cardGap);
+          doc.setFillColor(...card.background); doc.roundedRect(x,40,cardWidth,25,2,2,"F");
+          doc.setFont("helvetica","bold"); doc.setFontSize(7); doc.setTextColor(71,85,105);
+          doc.text(card.label,x+4,47);
+          doc.setFontSize(10); doc.setTextColor(...card.color);
+          doc.text(doc.splitTextToSize(rupiah(card.value),cardWidth-8),x+4,57);
+        });
+        doc.setFont("helvetica","bold"); doc.setFontSize(10); doc.setTextColor(20,54,104);
+        doc.text("PERBANDINGAN PEMASUKAN & PENGELUARAN",left,75);
+        const chartRows = [
+          { label:"Pemasukan", amount:income, color:[16,185,129] },
+          { label:"Pengeluaran", amount:expense, color:[244,63,94] }
+        ];
+        const chartMax = Math.max(income,expense,1);
+        const barX = left+43;
+        const barWidth = 100;
+        chartRows.forEach((row,index) => {
+          const rowY = 84+index*14;
+          doc.setFont("helvetica","normal"); doc.setFontSize(8); doc.setTextColor(51,65,85);
+          doc.text(row.label,left,rowY+4);
+          doc.setFillColor(241,245,249); doc.roundedRect(barX,rowY,barWidth,6,2,2,"F");
+          if (row.amount > 0) {
+            doc.setFillColor(...row.color);
+            doc.roundedRect(barX,rowY,Math.max(1,barWidth*row.amount/chartMax),6,2,2,"F");
+          }
+          doc.setFont("helvetica","bold"); doc.setTextColor(...row.color);
+          doc.text(rupiah(row.amount),right,rowY+4,{align:"right"});
+        });
+        doc.setDrawColor(226,232,240); doc.line(left,116,right,116);
+        doc.setFont("helvetica","bold"); doc.setFontSize(10); doc.setTextColor(20,54,104);
+        doc.text("RINCIAN TRANSAKSI",left,124);
+        let y = 128;
+        const drawTableHeader = () => {
+          doc.setFillColor(20,54,104); doc.rect(left,y,right-left,8,"F");
+          doc.setFont("helvetica","bold"); doc.setFontSize(8); doc.setTextColor(255,255,255);
+          doc.text("TANGGAL",left+2,y+5.5);
+          doc.text("JENIS / PENERIMA",left+27,y+5.5);
+          doc.text("KETERANGAN",left+80,y+5.5);
+          doc.text("NOMINAL",right-2,y+5.5,{align:"right"});
+          y += 8;
+        };
+        drawTableHeader();
+        if (!entries.length) {
+          doc.setFont("helvetica","normal"); doc.setFontSize(9); doc.setTextColor(100,116,139);
+          doc.text("Tidak ada transaksi pada periode ini.",left+2,y+7);
+          y += 12;
+        }
+        for (const entry of entries) {
+          const descriptionLines = doc.splitTextToSize(String(entry.description || "-"),72);
+          const categoryLines = doc.splitTextToSize(String(entry.type === "income" ? entry.recipient || "-" : entry.category || "-"),48);
+          const rowHeight = Math.max(9,Math.max(descriptionLines.length,categoryLines.length)*4+3);
+          if (y + rowHeight > 268) {
+            doc.addPage();
+            drawHeader();
+            y = 42;
+            drawTableHeader();
+          }
+          doc.setDrawColor(226,232,240); doc.line(left,y+rowHeight,right,y+rowHeight);
+          doc.setFont("helvetica","normal"); doc.setFontSize(8); doc.setTextColor(51,65,85);
+          doc.text(dateLabel(entry.date),left+2,y+5);
+          doc.setFont("helvetica","bold"); doc.setTextColor(entry.type === "income" ? 5 : 190,entry.type === "income" ? 150 : 18,entry.type === "income" ? 105 : 60);
+          doc.text(entry.type === "income" ? "Pemasukan" : "Pengeluaran",left+27,y+5);
+          doc.setFont("helvetica","normal"); doc.setTextColor(71,85,105);
+          doc.text(categoryLines,left+27,y+9);
+          doc.setTextColor(51,65,85);
+          doc.text(descriptionLines,left+80,y+5);
+          doc.setFont("helvetica","bold");
+          doc.text(rupiah(entry.amount),right-2,y+5,{align:"right"});
+          y += rowHeight;
+        }
+        const pageCount = doc.getNumberOfPages();
+        for (let page=1; page<=pageCount; page+=1) {
+          doc.setPage(page);
+          doc.setFont("helvetica","normal"); doc.setFontSize(7); doc.setTextColor(100,116,139);
+          doc.text(`Halaman ${page} dari ${pageCount}`,right,291,{align:"right"});
+        }
+        const filenameRange = `${start || "awal"}_sampai_${end || "akhir"}`.replace(/[^a-zA-Z0-9_-]/g,"-");
+        preparePdfDownload(doc,`Buku-Besar_${filenameRange}.pdf`);
       }
       async function createReportPdf(mode,reportStyle = "detail",customReport = null) {
         if (!pdfAvailable()) return;
@@ -1984,6 +2297,9 @@
       $("expense-date").value = today;
       $("goods-date").value = today;
       $("attendance-date").value = today;
+      $("ledger-date").value = today;
+      $("ledger-filter-start").value = `${today.slice(0,8)}01`;
+      $("ledger-filter-end").value = today;
       $("attendance-week").value = isoWeekKey(new Date(`${today}T00:00:00`));
       $("report-date").value = today;
       $("custom-report-date").value = today;
@@ -1991,6 +2307,114 @@
       $("report-week").value = isoWeekKey(new Date(`${today}T00:00:00`));
       $("report-custom-start").value = `${today.slice(0,8)}01`;
       $("report-custom-end").value = today;
+      function resetLedgerForm() {
+        $("ledger-form").reset();
+        $("ledger-id").value = "";
+        $("ledger-date").value = today;
+        $("ledger-form-title").textContent = "Input transaksi";
+        $("ledger-submit").textContent = "Simpan Transaksi";
+        $("ledger-cancel").classList.add("hidden");
+        $("ledger-photo-preview-wrap").classList.add("hidden");
+        $("ledger-photo-preview").removeAttribute("src");
+        pendingLedgerPhoto = "";
+        pendingLedgerPhotoRemoved = false;
+      }
+      $("ledger-form").addEventListener("submit",async (event) => {
+        event.preventDefault();
+        const id = $("ledger-id").value;
+        const existing = state.ledgerEntries.find((entry) => entry.id === id);
+        const entry = {
+          id:id || uid(),
+          date:$("ledger-date").value,
+          type:"income",
+          recipient:$("ledger-recipient").value.trim(),
+          description:$("ledger-description").value.trim(),
+          amount:Number($("ledger-amount").value),
+          photo:pendingLedgerPhoto || (pendingLedgerPhotoRemoved ? "" : existing && existing.photo || ""),
+          createdAt:existing ? existing.createdAt : new Date().toISOString()
+        };
+        if (!isValidIsoDate(entry.date) || !entry.recipient || !entry.description || !Number.isSafeInteger(entry.amount) || entry.amount <= 0) {
+          notify("Tanggal, nama penerima, keterangan, dan nominal transaksi yang valid wajib diisi.",true);
+          return;
+        }
+        const previous = state.ledgerEntries;
+        state.ledgerEntries = existing
+          ? previous.map((item) => item.id === existing.id ? entry : item)
+          : [...previous,entry];
+        if (!await persist()) { state.ledgerEntries = previous; return; }
+        resetLedgerForm();
+        render();
+        notify(existing ? "Transaksi Buku Besar berhasil diperbarui." : "Transaksi berhasil disimpan ke Buku Besar.");
+      });
+      $("ledger-cancel").addEventListener("click",resetLedgerForm);
+      $("ledger-rows").addEventListener("click",async (event) => {
+        const button = event.target.closest("button");
+        if (!button) return;
+        if (button.dataset.ledgerPhoto) {
+          const entry = state.ledgerEntries.find((item) => item.id === button.dataset.ledgerPhoto);
+          if (!entry || !entry.photo) return;
+          const win = window.open();
+          if (!win) { notify("Popup diblokir browser. Izinkan popup untuk melihat foto.",true); return; }
+          win.document.write(`<title>Bukti Pemasukan</title><img alt="Bukti pemasukan" src="${entry.photo}" style="max-width:100%;height:auto">`);
+          return;
+        }
+        const entry = state.ledgerEntries.find((item) => item.id === (button.dataset.editLedger || button.dataset.deleteLedger));
+        if (!entry) return;
+        if (button.dataset.editLedger) {
+          $("ledger-id").value = entry.id;
+          $("ledger-date").value = entry.date;
+          $("ledger-recipient").value = entry.recipient || entry.category || "";
+          $("ledger-description").value = entry.description;
+          $("ledger-amount").value = String(entry.amount);
+          pendingLedgerPhoto = "";
+          pendingLedgerPhotoRemoved = false;
+          if (entry.photo) {
+            $("ledger-photo-preview").src = entry.photo;
+            $("ledger-photo-preview-wrap").classList.remove("hidden");
+          } else {
+            $("ledger-photo-preview").removeAttribute("src");
+            $("ledger-photo-preview-wrap").classList.add("hidden");
+          }
+          $("ledger-form-title").textContent = "Edit transaksi Buku Besar";
+          $("ledger-submit").textContent = "Simpan Perubahan";
+          $("ledger-cancel").classList.remove("hidden");
+          $("ledger-form").scrollIntoView({behavior:"smooth",block:"start"});
+          return;
+        }
+        if (!confirm("Hapus transaksi Buku Besar ini?")) return;
+        const previous = state.ledgerEntries;
+        state.ledgerEntries = previous.filter((item) => item.id !== entry.id);
+        if (!await persist()) state.ledgerEntries = previous;
+        else { render(); notify("Transaksi Buku Besar dihapus."); }
+      });
+      $("ledger-photo").addEventListener("change",async (event) => {
+        const file = event.target.files[0];
+        pendingLedgerPhoto = "";
+        if (!file) return;
+        try {
+          pendingLedgerPhoto = await imageToDataUrl(file);
+          pendingLedgerPhotoRemoved = false;
+          $("ledger-photo-preview").src = pendingLedgerPhoto;
+          $("ledger-photo-preview-wrap").classList.remove("hidden");
+        } catch (error) {
+          console.error("Bukti foto pemasukan gagal diproses.",error);
+          notify(error.message || "Bukti foto gagal diproses.",true);
+          event.target.value = "";
+        }
+      });
+      $("ledger-photo-remove").addEventListener("click",() => {
+        pendingLedgerPhoto = "";
+        pendingLedgerPhotoRemoved = true;
+        $("ledger-photo").value = "";
+        $("ledger-photo-preview").removeAttribute("src");
+        $("ledger-photo-preview-wrap").classList.add("hidden");
+      });
+      $("ledger-filter-start").addEventListener("change",renderLedger);
+      $("ledger-filter-end").addEventListener("change",renderLedger);
+      $("ledger-pdf").addEventListener("click",() => createLedgerPdf().catch((error) => {
+        console.error("Gagal membuat PDF Buku Besar.",error);
+        notify(error.message || "PDF Buku Besar gagal dibuat. Periksa file logo dan koneksi browser, lalu coba lagi.",true);
+      }));
       TYPES.forEach((type) => $("expense-filter-type").insertAdjacentHTML("beforeend",`<option value="${type}">${type} — ${TYPE_LABELS[type]}</option>`));
       $("expense-type").addEventListener("change",() => {
         const isPiecework = $("expense-type").value === "GJ BORONGAN";
@@ -2495,6 +2919,50 @@
         renderBossReportLink();
         notify("Akses viewer bos sudah dicabut.");
       });
+      $("ledger-share-create").addEventListener("click",async () => {
+        let token;
+        try {
+          token = generateBossReportToken();
+        } catch (error) {
+          notify(error.message,true);
+          return;
+        }
+        const previousToken = state.ledgerShareToken;
+        state.ledgerShareToken = token;
+        if (!await persist()) {
+          state.ledgerShareToken = previousToken;
+          return;
+        }
+        renderLedgerShareLink();
+        if (location.protocol === "file:") {
+          notify("Tautan lokal hanya berfungsi di komputer ini. Unggah aplikasi ke hosting HTTPS, lalu buat tautan dari alamat hosting.",true);
+        } else {
+          notify("Tautan Buku Besar untuk bos aktif. Bagikan hanya kepada pihak yang berwenang.");
+        }
+      });
+      $("ledger-share-copy").addEventListener("click",async () => {
+        const input = $("ledger-share-url");
+        try {
+          await navigator.clipboard.writeText(input.value);
+          notify("Tautan Buku Besar untuk bos berhasil disalin.");
+        } catch (error) {
+          console.error("Tautan Buku Besar tidak dapat disalin otomatis.",error);
+          input.focus();
+          input.select();
+          notify("Salin tautan yang sudah dipilih secara manual.",true);
+        }
+      });
+      $("ledger-share-revoke").addEventListener("click",async () => {
+        if (!state.ledgerShareToken || !confirm("Cabut akses tautan Buku Besar? Tautan lama akan langsung berhenti berfungsi.")) return;
+        const previousToken = state.ledgerShareToken;
+        state.ledgerShareToken = "";
+        if (!await persist()) {
+          state.ledgerShareToken = previousToken;
+          return;
+        }
+        renderLedgerShareLink();
+        notify("Akses viewer Buku Besar sudah dicabut.");
+      });
       $("cash-note-daily-rate").addEventListener("input",calculateCashNoteBill);
       $("cash-note-daily-days").addEventListener("input",calculateCashNoteBill);
       $("cash-note-piecework-name").addEventListener("input",calculateCashNoteBill);
@@ -2610,7 +3078,7 @@
         }
       }
       function isBossViewerRoute() {
-        return location.hash.startsWith("#viewer=");
+        return location.hash.startsWith("#viewer=") || location.hash.startsWith("#ledger-viewer=");
       }
       async function activateSession(user) {
         if (isBossViewerRoute()) return;
@@ -2723,11 +3191,15 @@
         }
       }
       function openBossReportViewer() {
-        initializeBossReport().catch((error) => {
+        const isLedgerViewer = location.hash.startsWith("#ledger-viewer=");
+        const initializeViewer = isLedgerViewer ? initializeBossLedger : initializeBossReport;
+        initializeViewer().catch((error) => {
+          const status = isLedgerViewer ? $("boss-ledger-refresh-status") : $("boss-report-refresh-status");
+          const errorMessage = isLedgerViewer ? $("boss-ledger-error") : $("boss-report-error");
           console.error("Viewer laporan bos gagal diinisialisasi.",error);
-          $("boss-report-refresh-status").textContent = "Gagal memuat laporan";
-          $("boss-report-error").textContent = "Laporan belum dapat dimuat. Periksa koneksi internet dan konfigurasi Supabase.";
-          $("boss-report-error").classList.remove("hidden");
+          status.textContent = "Gagal memuat laporan";
+          errorMessage.textContent = "Laporan belum dapat dimuat. Periksa koneksi internet dan konfigurasi Supabase.";
+          errorMessage.classList.remove("hidden");
         });
       }
       window.addEventListener("hashchange",() => {
